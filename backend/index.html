@@ -202,6 +202,18 @@
         }
       }, [chatMessages, isChatLoading]);
 
+      useEffect(() => {
+        const hasSyncing = connections.some(conn => conn.status === "syncing");
+        if (hasSyncing) {
+          const timer = setTimeout(() => {
+            fetchFastenConnections();
+            fetchFHIRResources("Condition");
+            fetchFHIRResources("Observation");
+          }, 3000);
+          return () => clearTimeout(timer);
+        }
+      }, [connections]);
+
       // API Callers
       const fetchDashboardData = async () => {
         try {
@@ -317,16 +329,13 @@
           const res = await fetch("/api/fasten/sync", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ connection_id: connectionId })
+            body: JSON.stringify({
+              org_connection_id: connectionId,
+              connection_id: connectionId
+            })
           });
           await res.json();
-          // Poll for success or just reload resources in a few seconds
-          setTimeout(() => {
-            fetchFastenConnections();
-            fetchFHIRResources("Condition");
-            fetchFHIRResources("Observation");
-            setIsSyncing(false);
-          }, 3000);
+          fetchFastenConnections();
         } catch (e) {
           console.error("Error syncing fasten connection", e);
           setIsSyncing(false);
@@ -350,9 +359,11 @@
           if (event.data && typeof event.data === "string") {
             try {
               const parse = JSON.parse(event.data);
-              if (parse.event === "connection.success" || parse.event === "widget.complete") {
+              const eventType = parse.event || parse.event_type || parse.type;
+              if (eventType === "connection.success" || eventType === "widget.complete") {
                 // Register connection on backend
-                registerFastenConnection(parse);
+                const data = parse.data || parse;
+                registerFastenConnection(data);
               }
             } catch (err) {
               // Ignore non-json logs

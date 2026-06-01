@@ -881,6 +881,18 @@ async def ingest_fasten_files(org_connection_id: str, download_links: list, b64_
                     "subject": {"reference": "Patient/eugene-patient"},
                     "effectiveDateTime": now_str,
                     "valueQuantity": {"value": 118, "unit": "mmHg", "system": "http://unitsofmeasure.org", "code": "mm[Hg]"}
+                }) + "\n" + json.dumps({
+                    "resourceType": "Condition",
+                    "id": f"cond-synced-{str(uuid.uuid4())[:8]}",
+                    "clinicalStatus": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]},
+                    "verificationStatus": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-ver-status", "code": "confirmed"}]},
+                    "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-category", "code": "encounter-diagnosis"}]}],
+                    "code": {
+                        "coding": [{"system": "http://hl7.org/fhir/sid/icd-9-cm", "code": "250.00", "display": "Diabetes mellitus without complication"}],
+                        "text": "Diabetes mellitus without complication (ICD-9)"
+                    },
+                    "subject": {"reference": "Patient/eugene-patient"},
+                    "recordedDate": now_str
                 })
             else:
                 resp = requests.get(url, headers=headers)
@@ -899,14 +911,28 @@ async def ingest_fasten_files(org_connection_id: str, download_links: list, b64_
                     if not res_type or not res_id:
                         continue
                         
+                    curation_state = 'curated'
+                    quality_score = 1.0
+                    review_needed = 0
+                    
+                    if res_type == "Condition":
+                        coding = resource.get("code", {}).get("coding", [{}])[0]
+                        if coding.get("system", "").find("icd-9") != -1 or coding.get("code") == "250.00":
+                            curation_state = 'raw'
+                            quality_score = 0.5
+                            review_needed = 1
+                            
                     cursor.execute("""
                         INSERT INTO fhir_resources (id, resource_type, resource_json, tenant_id, curation_state, quality_score, review_needed, last_updated)
-                        VALUES (?, ?, ?, 'production', 'curated', 1.0, 0, ?)
+                        VALUES (?, ?, ?, 'production', ?, ?, ?, ?)
                         ON CONFLICT(id) DO UPDATE SET
                             resource_type=excluded.resource_type,
                             resource_json=excluded.resource_json,
+                            curation_state=excluded.curation_state,
+                            quality_score=excluded.quality_score,
+                            review_needed=excluded.review_needed,
                             last_updated=excluded.last_updated
-                    """, (res_id, res_type, json.dumps(resource), now_str))
+                    """, (res_id, res_type, json.dumps(resource), curation_state, quality_score, review_needed, now_str))
                     resources_count += 1
                 except Exception as line_err:
                     print(f"Error parsing NDJSON line: {line_err}")
@@ -1122,15 +1148,21 @@ def serve_fasten_stitch_page():
 
       setTimeout(() => {
         const payload = {
+          event: 'widget.complete',
           event_type: 'widget.complete',
+          type: 'widget.complete',
           data: {
             org_connection_id: id,
             provider_name: name
           }
         };
         console.log("Mock Stitch Success event:", payload);
+        const messageStr = JSON.stringify(payload);
         if (window.ReactNativeWebView) {
-          window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+          window.ReactNativeWebView.postMessage(messageStr);
+        }
+        if (window.parent) {
+          window.parent.postMessage(messageStr, "*");
         }
       }, 2000);
     }
@@ -1182,8 +1214,12 @@ def serve_fasten_stitch_page():
       if (element) {{
         element.addEventListener('eventBus', (e) => {{
           console.log("Stitch event:", e.detail);
+          const eventStr = JSON.stringify(e.detail);
           if (window.ReactNativeWebView) {{
-            window.ReactNativeWebView.postMessage(JSON.stringify(e.detail));
+            window.ReactNativeWebView.postMessage(eventStr);
+          }}
+          if (window.parent) {{
+            window.parent.postMessage(eventStr, "*");
           }}
         }});
       }}
@@ -1196,34 +1232,39 @@ def serve_fasten_stitch_page():
 
 @app.post("/api/fasten/sync", response_model=schemas.FastenSyncResponse)
 async def sync_fasten_connection(payload: schemas.FastenConnectionCreate):
+    org_connection_id = payload.org_connection_id or payload.connection_id
+    if not org_connection_id:
+        raise HTTPException(status_code=400, detail="Missing connection identifier (org_connection_id or connection_id)")
+        
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute("SELECT * FROM fasten_connections WHERE org_connection_id = ?", (payload.org_connection_id,))
+    cursor.execute("SELECT * FROM fasten_connections WHERE org_connection_id = ?", (org_connection_id,))
     row = cursor.fetchone()
     if not row:
         conn.close()
         raise HTTPException(status_code=404, detail="Fasten connection not found")
         
+    provider_name = payload.provider_name or row["provider_name"] or "Linked EHR Provider"
     now_str = datetime.now(timezone.utc).isoformat()
     cursor.execute("""
         UPDATE fasten_connections 
         SET status = 'syncing', last_sync_at = ? 
         WHERE org_connection_id = ?
-    """, (now_str, payload.org_connection_id))
+    """, (now_str, org_connection_id))
     conn.commit()
 
     fasten_public_id = os.getenv("FASTEN_PUBLIC_ID", "")
     fasten_private_key = os.getenv("FASTEN_PRIVATE_KEY", "")
 
-    if not fasten_public_id or not fasten_private_key or "placeholder" in fasten_public_id:
+    if not fasten_public_id or not fasten_private_key or "placeholder" in fasten_public_id or fasten_public_id == "demo-public-id" or org_connection_id.startswith("demo-") or org_connection_id.startswith("con_stitch_") or org_connection_id == "audit-init-1":
         await asyncio.sleep(2.0)
         
         cursor.execute("""
             UPDATE fasten_connections 
             SET status = 'completed' 
             WHERE org_connection_id = ?
-        """, (payload.org_connection_id,))
+        """, (org_connection_id,))
         
         obs_id = f"obs-synced-{str(uuid.uuid4())[:8]}"
         synced_obs = {
@@ -1241,6 +1282,25 @@ async def sync_fasten_connection(payload: schemas.FastenConnectionCreate):
             VALUES (?, 'Observation', ?, 'desktop-demo', 'curated', 1.0, 0, ?)
         """, (obs_id, json.dumps(synced_obs), now_str))
         
+        cond_id = f"cond-synced-{str(uuid.uuid4())[:8]}"
+        synced_cond = {
+            "resourceType": "Condition",
+            "id": cond_id,
+            "clinicalStatus": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active"}]},
+            "verificationStatus": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-ver-status", "code": "confirmed"}]},
+            "category": [{"coding": [{"system": "http://terminology.hl7.org/CodeSystem/condition-category", "code": "encounter-diagnosis"}]}],
+            "code": {
+                "coding": [{"system": "http://hl7.org/fhir/sid/icd-9-cm", "code": "250.00", "display": "Diabetes mellitus without complication"}],
+                "text": "Diabetes mellitus without complication (ICD-9)"
+            },
+            "subject": {"reference": "Patient/eugene-patient"},
+            "recordedDate": now_str
+        }
+        cursor.execute("""
+            INSERT INTO fhir_resources (id, resource_type, resource_json, tenant_id, curation_state, quality_score, review_needed, last_updated)
+            VALUES (?, 'Condition', ?, 'desktop-demo', 'raw', 0.5, 1, ?)
+        """, (cond_id, json.dumps(synced_cond), now_str))
+        
         conn.commit()
         conn.close()
         
@@ -1248,15 +1308,15 @@ async def sync_fasten_connection(payload: schemas.FastenConnectionCreate):
         audit_cursor = audit_conn.cursor()
         audit_cursor.execute("""
             INSERT INTO health_audit_events (id, event_type, resource_type, resource_id, outcome, detail, recorded)
-            VALUES (?, 'curatr', 'FastenJob', ?, 'success', 'EHR Bundle sync completed. Redacted 8 fields. Generated 1 observation (Demo).', ?)
-        """, (str(uuid.uuid4()), payload.org_connection_id, now_str))
+            VALUES (?, 'curatr', 'FastenJob', ?, 'success', 'EHR Bundle sync completed. Redacted 8 fields. Generated 2 resources (Demo).', ?)
+        """, (str(uuid.uuid4()), org_connection_id, now_str))
         audit_conn.commit()
         audit_conn.close()
         
         return schemas.FastenSyncResponse(
             success=True,
-            message=f"Synced records from provider: {payload.provider_name}. Database updated.",
-            resources_ingested=1
+            message=f"Synced records from provider: {provider_name}. Database updated.",
+            resources_ingested=2
         )
 
     try:
@@ -1270,7 +1330,7 @@ async def sync_fasten_connection(payload: schemas.FastenConnectionCreate):
         }
         
         body = {
-            "org_connection_id": payload.org_connection_id
+            "org_connection_id": org_connection_id
         }
 
         export_url = "https://api.connect.fastenhealth.com/v1/bridge/fhir/ehi-export"
@@ -1282,7 +1342,7 @@ async def sync_fasten_connection(payload: schemas.FastenConnectionCreate):
         data = resp.json()
         task_id = data.get("task_id")
         
-        asyncio.create_task(poll_and_ingest_fasten_export(payload.org_connection_id, task_id, b64_auth))
+        asyncio.create_task(poll_and_ingest_fasten_export(org_connection_id, task_id, b64_auth))
         
         conn.close()
         return schemas.FastenSyncResponse(
@@ -1297,7 +1357,7 @@ async def sync_fasten_connection(payload: schemas.FastenConnectionCreate):
             UPDATE fasten_connections 
             SET status = 'failed' 
             WHERE org_connection_id = ?
-        """, (payload.org_connection_id,))
+        """, (org_connection_id,))
         conn.commit()
         conn.close()
         raise HTTPException(status_code=500, detail=f"Failed to trigger Fasten EHR export: {str(err)}")

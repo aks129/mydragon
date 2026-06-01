@@ -27,6 +27,7 @@ export default function HealthProfileScreen() {
   // Fasten Connect States
   const [fastenConnections, setFastenConnections] = useState<any[]>([]);
   const [fhirConditions, setFhirConditions] = useState<any[]>([]);
+  const [fhirObservations, setFhirObservations] = useState<any[]>([]);
   const [showFastenModal, setShowFastenModal] = useState(false);
   const [linkingProvider, setLinkingProvider] = useState(false);
   const [syncingProviderId, setSyncingProviderId] = useState<string | null>(null);
@@ -47,10 +48,11 @@ export default function HealthProfileScreen() {
 
   const loadProfile = async () => {
     try {
-      const [profileData, fastenData, fhirData] = await Promise.all([
+      const [profileData, fastenData, fhirData, fhirObsData] = await Promise.all([
         fetchPatientProfile(),
         fetchFastenConnections(),
-        fetchFhirResources("Condition")
+        fetchFhirResources("Condition"),
+        fetchFhirResources("Observation")
       ]);
       setPatient(profileData);
       setFastenConnections(fastenData);
@@ -58,6 +60,11 @@ export default function HealthProfileScreen() {
         setFhirConditions(fhirData.entry.map((e: any) => e.resource));
       } else {
         setFhirConditions([]);
+      }
+      if (fhirObsData && fhirObsData.entry) {
+        setFhirObservations(fhirObsData.entry.map((e: any) => e.resource));
+      } else {
+        setFhirObservations([]);
       }
     } catch (error) {
       console.error(error);
@@ -69,6 +76,16 @@ export default function HealthProfileScreen() {
   useEffect(() => {
     loadProfile();
   }, []);
+
+  useEffect(() => {
+    const hasSyncing = fastenConnections.some((conn: any) => conn.status === "syncing");
+    if (hasSyncing) {
+      const timer = setTimeout(() => {
+        loadProfile();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [fastenConnections]);
 
   const triggerUpload = async (fileType: "lab" | "discharge") => {
     setParsing(true);
@@ -494,6 +511,34 @@ export default function HealthProfileScreen() {
           })
         ) : (
           <Text style={styles.noTagText}>No FHIR Conditions synced.</Text>
+        )}
+
+        {/* FHIR-based Observations */}
+        <Text style={[styles.subHeader, { marginTop: 15 }]}>EHR FHIR Observations (HealthClaw Redacted)</Text>
+        {fhirObservations.length > 0 ? (
+          fhirObservations.map((obs: any, idx: number) => {
+            const coding = obs.code?.coding?.[0] || {};
+            const valQty = obs.valueQuantity || {};
+            return (
+              <View key={idx} style={styles.fhirObservationItem}>
+                <View style={styles.fhirCondLeft}>
+                  <Text style={styles.fhirCondName}>
+                    {obs.code?.text || coding.display || "Observation"}
+                  </Text>
+                  <Text style={styles.fhirCondDetails}>
+                    LOINC: {coding.code || "N/A"} • Date: {obs.effectiveDateTime ? obs.effectiveDateTime.slice(0, 10) : "N/A"}
+                  </Text>
+                </View>
+                <View style={styles.fhirCondRight}>
+                  <Text style={styles.fhirObservationValue}>
+                    {valQty.value !== undefined ? `${valQty.value} ${valQty.unit || ""}` : "N/A"}
+                  </Text>
+                </View>
+              </View>
+            );
+          })
+        ) : (
+          <Text style={styles.noTagText}>No FHIR Observations synced.</Text>
         )}
 
         {/* Allergies */}
@@ -1181,6 +1226,23 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
     marginTop: 5,
+  },
+  fhirObservationItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: Theme.colors.surfaceGlass,
+    borderColor: Theme.colors.surfaceGlassBorder,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    marginTop: 5,
+  },
+  fhirObservationValue: {
+    color: Theme.colors.secondary,
+    fontSize: 13,
+    fontWeight: "bold",
   },
   fhirCondLeft: {
     flex: 1,

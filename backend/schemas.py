@@ -65,8 +65,9 @@ class FormSubmit(BaseModel):
 
 # --- Fasten Health Connect Schemas ---
 class FastenConnectionCreate(BaseModel):
-    org_connection_id: str
-    provider_name: str
+    org_connection_id: Optional[str] = None
+    connection_id: Optional[str] = None
+    provider_name: Optional[str] = None
 
 class FastenConnection(BaseModel):
     org_connection_id: str
