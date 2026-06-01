@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FHIR-IQ Healthcare Agent Portal</title>
+  
+  <!-- Tailwind CSS v3 CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+            },
+            slate: {
+              950: '#020617',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- React & ReactDOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel CDN for compiling JSX inside the browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      overflow-x: hidden;
+    }
+    /* Dynamic scrollbar styles */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #10b981;
+    }
+    /* Waveform Animation */
+    @keyframes pulse {
+      0%, 100% { height: 8px; }
+      50% { height: 28px; }
+    }
+    .wave-bar {
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .wave-bar:nth-child(2) { animation-delay: 0.15s; }
+    .wave-bar:nth-child(3) { animation-delay: 0.3s; }
+    .wave-bar:nth-child(4) { animation-delay: 0.45s; }
+    .wave-bar:nth-child(5) { animation-delay: 0.6s; }
+  </style>
+</head>
+<body class="h-full text-slate-100 selection:bg-brand-500 selection:text-white">
+  
+  <div id="root" class="h-full"></div>
+
+  <!-- React Application Core Component -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // SVG Icon Component Helper
+    function Icon({ name, className = "w-5 h-5" }) {
+      const icons = {
+        dashboard: (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z" />
+        ),
+        chat: (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        ),
+        vault: (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        ),
+        call: (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+        ),
+        filler: (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        ),
+        check: (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        ),
+        alert: (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        ),
+        edit: (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        ),
+        sync: (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.2" />
+        ),
+        user: (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        ),
+        plus: (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        ),
+        lock: (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        )
+      };
+
+      return (
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          {icons[name] || <circle cx="12" cy="12" r="10" strokeWidth={2} />}
+        </svg>
+      );
+    }
+
+    function App() {
+      const [isAuthenticated, setIsAuthenticated] = useState(false);
+      const [email, setEmail] = useState("gene@fhiriq.com");
+      const [password, setPassword] = useState("password");
+      const [activeTab, setActiveTab] = useState("dashboard");
+
+      // App State
+      const [patient, setPatient] = useState(null);
+      const [careGaps, setCareGaps] = useState([]);
+      const [refills, setRefills] = useState([]);
+      const [habits, setHabits] = useState(null);
+      
+      // EHR Vault State
+      const [fhirResources, setFhirResources] = useState({});
+      const [selectedCategory, setSelectedCategory] = useState("Condition");
+      const [selectedResource, setSelectedResource] = useState(null);
+      const [resourceCuration, setResourceCuration] = useState(null);
+      const [curatrAudit, setCuratrAudit] = useState(null);
+      const [connections, setConnections] = useState([]);
+      const [isSyncing, setIsSyncing] = useState(false);
+      const [showLinkModal, setShowLinkModal] = useState(false);
+
+      // Chat State
+      const [chatMessages, setChatMessages] = useState([
+        { sender: "robin", text: "Hello Eugene! I am Robin, your AI healthcare assistant. How can I help you manage your HEDIS care gaps or review your medical records today?" }
+      ]);
+      const [chatInput, setChatInput] = useState("");
+      const [chatThoughts, setChatThoughts] = useState([]);
+      const [isChatLoading, setIsChatLoading] = useState(false);
+      const chatEndRef = useRef(null);
+
+      // Call Simulator State
+      const [phoneNumber, setPhoneNumber] = useState("+1 555-019-2834");
+      const [callType, setCallType] = useState("simulated"); // 'simulated' or 'bland'
+      const [isCalling, setIsCalling] = useState(false);
+      const [callStatus, setCallStatus] = useState("");
+      const [callTranscript, setCallTranscript] = useState([]);
+      const [simSocket, setSimSocket] = useState(null);
+
+      // Form Filler State
+      const [forms, setForms] = useState([]);
+      const [selectedForm, setSelectedForm] = useState(null);
+      const [formDocUrl, setFormDocUrl] = useState("https://fhiriq.com/forms/specialist_referral_form.pdf");
+      const [isFilling, setIsFilling] = useState(false);
+      const [filledFields, setFilledFields] = useState({});
+      const [isSigned, setIsSigned] = useState(false);
+      const [formStatus, setFormStatus] = useState("");
+
+      // Patient Demographics Edit Modal
+      const [showEditProfile, setShowEditProfile] = useState(false);
+      const [editName, setEditName] = useState("");
+      const [editDob, setEditDob] = useState("");
+      const [editPhone, setEditPhone] = useState("");
+      const [editEmail, setEditEmail] = useState("");
+      const [editInsurance, setEditInsurance] = useState("");
+      const [editPolicy, setEditPolicy] = useState("");
+
+      useEffect(() => {
+        if (isAuthenticated) {
+          fetchDashboardData();
+          fetchFHIRResources("Condition");
+          fetchFastenConnections();
+          fetchFormTemplates();
+        }
+      }, [isAuthenticated]);
+
+      useEffect(() => {
+        if (chatEndRef.current) {
+          chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, [chatMessages, isChatLoading]);
+
+      // API Callers
+      const fetchDashboardData = async () => {
+        try {
+          const patRes = await fetch("/api/patient");
+          const pat = await patRes.json();
+          setPatient(pat);
+          setEditName(pat.name);
+          setEditDob(pat.dob);
+          setEditPhone(pat.phone);
+          setEditEmail(pat.email);
+          setEditInsurance(pat.insurance_provider);
+          setEditPolicy(pat.insurance_policy_num);
+
+          const gapsRes = await fetch("/api/health/gaps");
+          const gaps = await gapsRes.json();
+          setCareGaps(gaps);
+
+          const refillsRes = await fetch("/api/health/refills");
+          const ref = await refillsRes.json();
+          setRefills(ref);
+
+          const habitsRes = await fetch("/api/health/habits");
+          const hab = await habitsRes.json();
+          setHabits(hab);
+        } catch (e) {
+          console.error("Error fetching dashboard data", e);
+        }
+      };
+
+      const updateProfile = async (e) => {
+        e.preventDefault();
+        try {
+          const res = await fetch("/api/patient", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: editName,
+              dob: editDob,
+              phone: editPhone,
+              email: editEmail,
+              insurance_provider: editInsurance,
+              insurance_policy_num: editPolicy
+            })
+          });
+          const updated = await res.json();
+          setPatient(updated);
+          setShowEditProfile(false);
+        } catch (err) {
+          console.error("Error updating patient profile", err);
+        }
+      };
+
+      const fetchFHIRResources = async (type) => {
+        try {
+          const res = await fetch(`/api/fhir/${type}`);
+          const data = await res.json();
+          setFhirResources(prev => ({ ...prev, [type]: data.entry || [] }));
+        } catch (e) {
+          console.error("Error fetching FHIR resource: " + type, e);
+        }
+      };
+
+      const fetchCompiledTruth = async (type, id) => {
+        try {
+          const res = await fetch(`/api/fhir/${type}/${id}/$compiled-truth`);
+          const data = await res.json();
+          setResourceCuration(data);
+          setCuratrAudit(null); // Reset audit panel
+        } catch (e) {
+          console.error("Error fetching compiled truth", e);
+        }
+      };
+
+      const runCuratrScan = async (type, id) => {
+        try {
+          const res = await fetch(`/api/fhir/${type}/${id}/$curatr-evaluate`);
+          const data = await res.json();
+          setCuratrAudit(data);
+        } catch (e) {
+          console.error("Error running Curatr scan", e);
+        }
+      };
+
+      const applyCuratrFix = async (type, id, issueKey) => {
+        try {
+          const res = await fetch(`/api/fhir/${type}/${id}/$curatr-apply-fix`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fix_key: issueKey })
+          });
+          const data = await res.json();
+          // Reload
+          fetchCompiledTruth(type, id);
+          fetchFHIRResources(type);
+        } catch (e) {
+          console.error("Error applying Curatr fix", e);
+        }
+      };
+
+      const fetchFastenConnections = async () => {
+        try {
+          const res = await fetch("/api/fasten/connections");
+          const data = await res.json();
+          setConnections(data);
+        } catch (e) {
+          console.error("Error fetching fasten connections", e);
+        }
+      };
+
+      const syncFastenProvider = async (connectionId) => {
+        setIsSyncing(true);
+        try {
+          const res = await fetch("/api/fasten/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ connection_id: connectionId })
+          });
+          await res.json();
+          // Poll for success or just reload resources in a few seconds
+          setTimeout(() => {
+            fetchFastenConnections();
+            fetchFHIRResources("Condition");
+            fetchFHIRResources("Observation");
+            setIsSyncing(false);
+          }, 3000);
+        } catch (e) {
+          console.error("Error syncing fasten connection", e);
+          setIsSyncing(false);
+        }
+      };
+
+      const fetchFormTemplates = async () => {
+        try {
+          const res = await fetch("/api/forms");
+          const data = await res.json();
+          setForms(data);
+          if (data.length > 0) setSelectedForm(data[0]);
+        } catch (e) {
+          console.error("Error fetching forms", e);
+        }
+      };
+
+      // Handler for iframe Stitch component listener
+      useEffect(() => {
+        const handleIframeMessage = (event) => {
+          if (event.data && typeof event.data === "string") {
+            try {
+              const parse = JSON.parse(event.data);
+              if (parse.event === "connection.success" || parse.event === "widget.complete") {
+                // Register connection on backend
+                registerFastenConnection(parse);
+              }
+            } catch (err) {
+              // Ignore non-json logs
+            }
+          }
+        };
+
+        window.addEventListener("message", handleIframeMessage);
+        return () => window.removeEventListener("message", handleIframeMessage);
+      }, []);
+
+      const registerFastenConnection = async (data) => {
+        try {
+          const res = await fetch("/api/fasten/connections", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              org_connection_id: data.org_connection_id || "con_stitch_9921",
+              provider_name: data.provider_name || "Stanford Health Care",
+              status: "connected"
+            })
+          });
+          const newConn = await res.json();
+          fetchFastenConnections();
+          setShowLinkModal(false);
+          // Sync automatically
+          syncFastenProvider(newConn.org_connection_id);
+        } catch (e) {
+          console.error("Error registering fasten connection", e);
+        }
+      };
+
+      // Chat handler
+      const handleChatSubmit = async (e) => {
+        e.preventDefault();
+        if (!chatInput.trim()) return;
+
+        const userMsg = chatInput;
+        setChatMessages(prev => [...prev, { sender: "user", text: userMsg }]);
+        setChatInput("");
+        setIsChatLoading(true);
+        setChatThoughts([]);
+
+        try {
+          const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: userMsg })
+          });
+          const data = await res.json();
+          setChatMessages(prev => [...prev, { sender: "robin", text: data.response }]);
+          setChatThoughts(data.thoughts || []);
+        } catch (err) {
+          console.error("Error chatting with agent", err);
+          setChatMessages(prev => [...prev, { sender: "robin", text: "I'm sorry, I encountered an error communicating with the agent server." }]);
+        } finally {
+          setIsChatLoading(false);
+        }
+      };
+
+      // Call Simulator handler
+      const toggleCall = async () => {
+        if (isCalling) {
+          // Hang up
+          if (simSocket) {
+            simSocket.close();
+            setSimSocket(null);
+          }
+          setIsCalling(false);
+          setCallStatus("Call ended");
+          return;
+        }
+
+        setIsCalling(true);
+        setCallTranscript([]);
+        
+        if (callType === "bland") {
+          setCallStatus("Requesting dial-out from Bland.ai...");
+          try {
+            const res = await fetch("/api/calls/dispatch", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                phone_number: phoneNumber,
+                prompt_overlay: "Call the receptionist at Sarah Jenkins clinic to book a physical therapy appointment for Eugene."
+              })
+            });
+            const data = await res.json();
+            if (data.success) {
+              setCallStatus("Call active. Bland Call ID: " + data.call_id);
+            } else {
+              setCallStatus("Error: " + data.message);
+              setIsCalling(false);
+            }
+          } catch (e) {
+            setCallStatus("Failed to dispatch voice call.");
+            setIsCalling(false);
+          }
+        } else {
+          // Simulated Call via WebSocket
+          setCallStatus("Connecting WebSocket stream...");
+          const loc = window.location;
+          const wsProto = loc.protocol === "https:" ? "wss:" : "ws:";
+          const wsUrl = `${wsProto}//${loc.host}/api/calls/simulate`;
+          
+          const ws = new WebSocket(wsUrl);
+          setSimSocket(ws);
+
+          ws.onopen = () => {
+            setCallStatus("Call Initiated...");
+          };
+
+          ws.onmessage = (event) => {
+            try {
+              const parse = JSON.parse(event.data);
+              if (parse.type === "status") {
+                setCallStatus(parse.message);
+              } else if (parse.type === "transcript") {
+                setCallTranscript(prev => [...prev, parse]);
+              }
+            } catch (err) {
+              console.error(err);
+            }
+          };
+
+          ws.onclose = () => {
+            setCallStatus("Call completed.");
+            setIsCalling(false);
+            setSimSocket(null);
+            // Refresh appointment list in dashboard
+            fetchDashboardData();
+          };
+
+          ws.onerror = () => {
+            setCallStatus("WebSocket connection error.");
+            setIsCalling(false);
+            setSimSocket(null);
+          };
+        }
+      };
+
+      // Form Vision Filler handler
+      const handleFormFill = async () => {
+        if (!selectedForm) return;
+        setIsFilling(true);
+        setFormStatus("Reading document URL...");
+        
+        try {
+          const res = await fetch("/api/forms/fill-from-document", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ document_url: formDocUrl })
+          });
+          const data = await res.json();
+          setFilledFields(data.filled_data || {});
+          setFormStatus("Form mapped successfully.");
+        } catch (err) {
+          setFormStatus("Error auto-filling from document.");
+        } finally {
+          setIsFilling(false);
+        }
+      };
+
+      const handleFormSubmit = () => {
+        setFormStatus("Submitting signed form to EHR Vault...");
+        setTimeout(() => {
+          setFormStatus("Submitted successfully!");
+          setIsSigned(true);
+          // Add dummy record to Patient Observations or Provenance if needed, or just simulate
+          fetchDashboardData();
+        }, 1500);
+      };
+
+      // Navigation Category triggers
+      const handleCategoryChange = (cat) => {
+        setSelectedCategory(cat);
+        setSelectedResource(null);
+        setResourceCuration(null);
+        setCuratrAudit(null);
+        fetchFHIRResources(cat);
+      };
+
+      if (!isAuthenticated) {
+        return (
+          <div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-950">
+            <div class="max-w-md w-full space-y-8 bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl backdrop-blur-xl bg-opacity-70">
+              <div class="text-center">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-500 mb-4 shadow-lg shadow-brand-500/10">
+                  <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <h2 class="text-3xl font-bold tracking-tight text-white">FHIR-IQ portal</h2>
+                <p class="mt-2 text-sm text-slate-400">Autonomous HEDIS Care Agent Engine</p>
+              </div>
+              
+              <div class="space-y-4">
+                <div>
+                  <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">Developer Credentials Email</label>
+                  <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">
+                      <Icon name="user" className="w-4 h-4" />
+                    </span>
+                    <input 
+                      type="text" 
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      class="block w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">Developer Private Token</label>
+                  <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500">
+                      <Icon name="lock" className="w-4 h-4" />
+                    </span>
+                    <input 
+                      type="password" 
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      class="block w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setIsAuthenticated(true)}
+                  class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-slate-900 bg-brand-500 hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 transition-colors shadow-lg shadow-brand-500/20"
+                >
+                  Authenticate Platform Connection
+                </button>
+              </div>
+              <div class="text-center text-xs text-slate-500 pt-2">
+                Blue Button 2.0 / Fasten Health OAuth Compliant Gate
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div class="flex h-screen bg-slate-950 text-slate-100">
+          
+          {/* LEFT SIDEBAR NAVIGATION */}
+          <div class="w-64 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col justify-between">
+            <div class="p-5">
+              <div class="flex items-center space-x-3 mb-8">
+                <div class="w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center text-slate-950 font-bold text-lg shadow-lg shadow-brand-500/20">
+                  IQ
+                </div>
+                <div>
+                  <h1 class="text-lg font-bold leading-tight">FHIR-IQ</h1>
+                  <span class="text-[10px] text-brand-500 font-semibold uppercase tracking-wider">Cloud Engine v1.0</span>
+                </div>
+              </div>
+
+              <nav class="space-y-1.5">
+                {[
+                  { id: "dashboard", label: "Overview Dashboard", icon: "dashboard" },
+                  { id: "chat", label: "Robin Assistant", icon: "chat" },
+                  { id: "vault", label: "EHR FHIR Vault", icon: "vault" },
+                  { id: "call", label: "Outbound Call Simulator", icon: "call" },
+                  { id: "filler", label: "Form Vision Filler", icon: "filler" }
+                ].map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    class={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                      activeTab === item.id 
+                        ? "bg-brand-500 text-slate-950 font-semibold shadow-lg shadow-brand-500/10" 
+                        : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                    }`}
+                  >
+                    <Icon name={item.icon} className="w-5 h-5 flex-shrink-0" />
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            {/* User Profile Summary in Footer of Sidebar */}
+            <div class="p-4 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
+              {patient ? (
+                <div class="flex items-center space-x-3 overflow-hidden">
+                  <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold uppercase">
+                    {patient.name.charAt(0)}
+                  </div>
+                  <div class="overflow-hidden">
+                    <p class="text-sm font-medium text-white truncate">{patient.name}</p>
+                    <span class="text-[10px] text-slate-500 font-medium block truncate">{patient.email}</span>
+                  </div>
+                </div>
+              ) : (
+                <div class="animate-pulse flex space-x-3 w-full">
+                  <div class="rounded-full bg-slate-800 h-10 w-10"></div>
+                  <div class="flex-1 space-y-2 py-1">
+                    <div class="h-2 bg-slate-800 rounded"></div>
+                    <div class="h-2 bg-slate-800 rounded w-5/6"></div>
+                  </div>
+                </div>
+              )}
+              <button 
+                onClick={() => setIsAuthenticated(false)}
+                class="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
+                title="Disconnect Account"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* MAIN CONTENT WORKSPACE */}
+          <div class="flex-1 flex flex-col overflow-hidden bg-slate-950">
+            
+            {/* TOP ACTIONS BAR */}
+            <header class="h-16 bg-slate-900/40 border-b border-slate-900 px-8 flex items-center justify-between">
+              <h2 class="text-xl font-bold tracking-tight text-white capitalize">{activeTab} screen</h2>
+              <div class="flex items-center space-x-3">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-500/10 text-brand-500 border border-brand-500/20">
+                  <span class="w-1.5 h-1.5 rounded-full bg-brand-500 mr-1.5 animate-ping"></span>
+                  GCP Cloud Run Active
+                </span>
+              </div>
+            </header>
+
+            {/* SCREEN CONTROLS & VIEWS */}
+            <main class="flex-1 overflow-y-auto p-8">
+              
+              {/* TAB 1: OVERVIEW DASHBOARD */}
+              {activeTab === "dashboard" && patient && (
+                <div class="space-y-6">
+                  {/* Banner Profile Summary */}
+                  <div class="bg-gradient-to-r from-slate-900 to-slate-900/50 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
+                    <div class="flex items-center space-x-4">
+                      <div class="w-16 h-16 bg-brand-500/10 border border-brand-500/20 text-brand-500 rounded-2xl flex items-center justify-center font-bold text-2xl uppercase">
+                        {patient.name.charAt(0)}
+                      </div>
+                      <div>
+                        <div class="flex items-center space-x-2">
+                          <h3 class="text-2xl font-bold text-white leading-tight">{patient.name}</h3>
+                          <button 
+                            onClick={() => setShowEditProfile(true)}
+                            class="p-1 text-slate-500 hover:text-brand-500 rounded hover:bg-slate-800 transition-colors"
+                          >
+                            <Icon name="edit" className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p class="text-sm text-slate-400 mt-1">DOB: {patient.dob} | Phone: {patient.phone} | Policy: {patient.insurance_policy_num}</p>
+                      </div>
+                    </div>
+                    <div class="flex space-x-3">
+                      <div class="px-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-center min-w-[100px]">
+                        <span class="text-[10px] text-slate-500 uppercase font-semibold">Conditions</span>
+                        <p class="text-lg font-bold text-brand-500 mt-0.5">{patient.conditions?.length || 0}</p>
+                      </div>
+                      <div class="px-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-center min-w-[100px]">
+                        <span class="text-[10px] text-slate-500 uppercase font-semibold">Allergies</span>
+                        <p class="text-lg font-bold text-red-400 mt-0.5">{patient.allergies?.length || 0}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Care Gaps Banners Alerts */}
+                  {careGaps.length > 0 && (
+                    <div class="space-y-3">
+                      <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Open HEDIS Care Gaps ({careGaps.length})</h4>
+                        <span class="text-xs text-red-400 font-semibold flex items-center">
+                          <Icon name="alert" className="w-4 h-4 mr-1" /> Requires Booking
+                        </span>
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {careGaps.map((gap, i) => (
+                          <div key={i} class="bg-red-500/5 border border-red-500/20 rounded-xl p-4 flex items-center justify-between gap-4">
+                            <div>
+                              <span class="text-xs bg-red-500/10 text-red-400 px-2 py-0.5 rounded font-semibold border border-red-500/20">{gap.code || "HEDIS-Gap"}</span>
+                              <h5 class="text-sm font-bold text-white mt-1.5">{gap.measure_name}</h5>
+                              <p class="text-xs text-slate-400 mt-1">Status: {gap.status} | Last evaluable window: Oct 2026</p>
+                            </div>
+                            <button 
+                              onClick={() => {
+                                setActiveTab("call");
+                                setPhoneNumber(patient.phone);
+                              }}
+                              class="px-3 py-1.5 bg-red-500 text-slate-950 rounded-lg text-xs font-bold hover:bg-red-400 transition-colors shrink-0"
+                            >
+                              Dispatch Assistant
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Garmin Sync Wearable habits */}
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Steps Habits */}
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
+                      <h4 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">Garmin Synced Step Trends</h4>
+                      {habits ? (
+                        <div>
+                          <div class="flex items-end justify-between h-32 gap-2 mb-4 px-2">
+                            {[11200, 8400, 12500, 6800, 9900, 11500, 9200].map((step, idx) => {
+                              const pct = Math.min((step / 15000) * 100, 100);
+                              return (
+                                <div key={idx} class="flex-1 flex flex-col items-center">
+                                  <div class="w-full bg-brand-500/10 rounded-t-md relative overflow-hidden" style={{ height: `${pct}%` }}>
+                                    <div class="absolute inset-0 bg-gradient-to-t from-brand-600 to-brand-500"></div>
+                                  </div>
+                                  <span class="text-[9px] text-slate-500 mt-1.5">Day {idx+1}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div class="flex justify-between text-xs border-t border-slate-800 pt-3">
+                            <span class="text-slate-400">Weekly Avg Steps: <strong class="text-brand-500">{habits.average_steps}</strong></span>
+                            <span class="text-slate-400">Target Goal: <strong class="text-white">10k Steps/Day</strong></span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div class="h-32 bg-slate-950 rounded-xl flex items-center justify-center text-slate-600">No Habits Data</div>
+                      )}
+                    </div>
+
+                    {/* Resting Heart Rate Habits */}
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
+                      <h4 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">Resting Heart Rate Trends</h4>
+                      {habits ? (
+                        <div>
+                          <div class="flex items-end justify-between h-32 gap-3 mb-4 px-2">
+                            {[68, 65, 62, 60, 59, 61, 58].map((hr, idx) => {
+                              const pct = ((hr - 40) / (80 - 40)) * 100;
+                              return (
+                                <div key={idx} class="flex-1 flex flex-col items-center">
+                                  <div class="w-2.5 bg-brand-500/20 rounded-full h-full relative flex items-end">
+                                    <div class="w-2.5 rounded-full bg-brand-500" style={{ height: `${pct}%` }}></div>
+                                  </div>
+                                  <span class="text-[9px] text-slate-500 mt-1.5">{hr}bpm</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div class="flex justify-between text-xs border-t border-slate-800 pt-3">
+                            <span class="text-slate-400">Avg Heart Rate: <strong class="text-brand-500">{habits.average_resting_hr} BPM</strong></span>
+                            <span class="text-slate-400">Sleep Trend: <strong class="text-white">Optimal Deep Sleep</strong></span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div class="h-32 bg-slate-950 rounded-xl flex items-center justify-center text-slate-600">No Habits Data</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Active Medication Refill Checklist */}
+                  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
+                    <h4 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">Prescription Refill Badges</h4>
+                    <div class="space-y-3">
+                      {refills.map((refill, idx) => (
+                        <div key={idx} class="flex items-center justify-between p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                          <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/20 text-brand-500 flex items-center justify-center font-bold">
+                              💊
+                            </div>
+                            <div>
+                              <h5 class="text-sm font-bold text-white">{refill.medication_name}</h5>
+                              <p class="text-xs text-slate-500">Refills left: {refill.refills_left} | Rx number: {refill.rx_number}</p>
+                            </div>
+                          </div>
+                          <div class="flex items-center space-x-4">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                              refill.days_remaining <= 5 
+                                ? 'bg-red-500/10 text-red-400 border-red-500/20' 
+                                : 'bg-brand-500/10 text-brand-500 border-brand-500/20'
+                            }`}>
+                              {refill.days_remaining} Days Left
+                            </span>
+                            {refill.refills_left > 0 ? (
+                              <button 
+                                onClick={async () => {
+                                  alert(`Refill request for ${refill.medication_name} sent to pharmacy.`);
+                                  fetchDashboardData();
+                                }}
+                                class="px-2.5 py-1 bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold rounded-lg text-xs transition-colors"
+                              >
+                                Trigger Refill
+                              </button>
+                            ) : (
+                              <span class="text-xs text-slate-500">No refills</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* PROFILE EDIT MODAL */}
+              {showEditProfile && (
+                <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <h4 class="text-lg font-bold text-white">Edit Patient Demographics</h4>
+                      <button 
+                        onClick={() => setShowEditProfile(false)}
+                        class="text-slate-500 hover:text-white"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <form onSubmit={updateProfile} class="space-y-3">
+                      <div>
+                        <label class="text-xs font-semibold text-slate-400 block mb-1">Full Name</label>
+                        <input 
+                          type="text" 
+                          value={editName}
+                          onChange={e => setEditName(e.target.value)}
+                          class="block w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-brand-500"
+                        />
+                      </div>
+                      <div>
+                        <label class="text-xs font-semibold text-slate-400 block mb-1">Date of Birth</label>
+                        <input 
+                          type="text" 
+                          value={editDob}
+                          onChange={e => setEditDob(e.target.value)}
+                          class="block w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-brand-500"
+                        />
+                      </div>
+                      <div>
+                        <label class="text-xs font-semibold text-slate-400 block mb-1">Phone Number</label>
+                        <input 
+                          type="text" 
+                          value={editPhone}
+                          onChange={e => setEditPhone(e.target.value)}
+                          class="block w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-brand-500"
+                        />
+                      </div>
+                      <div>
+                        <label class="text-xs font-semibold text-slate-400 block mb-1">Email Address</label>
+                        <input 
+                          type="email" 
+                          value={editEmail}
+                          onChange={e => setEditEmail(e.target.value)}
+                          class="block w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-brand-500"
+                        />
+                      </div>
+                      <div class="grid grid-cols-2 gap-3">
+                        <div>
+                          <label class="text-xs font-semibold text-slate-400 block mb-1">Insurance Provider</label>
+                          <input 
+                            type="text" 
+                            value={editInsurance}
+                            onChange={e => setEditInsurance(e.target.value)}
+                            class="block w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-brand-500"
+                          />
+                        </div>
+                        <div>
+                          <label class="text-xs font-semibold text-slate-400 block mb-1">Policy Number</label>
+                          <input 
+                            type="text" 
+                            value={editPolicy}
+                            onChange={e => setEditPolicy(e.target.value)}
+                            class="block w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-brand-500"
+                          />
+                        </div>
+                      </div>
+                      <div class="flex justify-end gap-3 pt-3">
+                        <button 
+                          type="button" 
+                          onClick={() => setShowEditProfile(false)}
+                          class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-sm transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          type="submit"
+                          class="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-slate-950 font-semibold rounded-xl text-sm transition-colors"
+                        >
+                          Save Changes
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+
+              {/* TAB 2: ROBIN AI ASSISTANT CHAT */}
+              {activeTab === "chat" && (
+                <div class="h-[calc(100vh-12rem)] flex gap-6">
+                  {/* Chat interface */}
+                  <div class="flex-1 flex flex-col bg-slate-900 border border-slate-800 rounded-2xl shadow-lg overflow-hidden">
+                    {/* Chat Messages */}
+                    <div class="flex-1 overflow-y-auto p-5 space-y-4">
+                      {chatMessages.map((msg, i) => (
+                        <div key={i} class={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
+                          <div className={`max-w-[70%] p-4 rounded-2xl text-sm shadow border ${
+                            msg.sender === "user"
+                              ? "bg-brand-500 text-slate-950 border-brand-500/20 rounded-tr-none font-medium"
+                              : "bg-slate-950 text-slate-100 border-slate-800 rounded-tl-none leading-relaxed"
+                          }`}>
+                            {msg.text}
+                          </div>
+                        </div>
+                      ))}
+                      {isChatLoading && (
+                        <div class="flex justify-start">
+                          <div class="bg-slate-950 border border-slate-800 p-4 rounded-2xl rounded-tl-none flex space-x-1.5 items-center">
+                            <span class="w-2 h-2 rounded-full bg-brand-500 animate-bounce"></span>
+                            <span class="w-2 h-2 rounded-full bg-brand-500 animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+                            <span class="w-2 h-2 rounded-full bg-brand-500 animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+                          </div>
+                        </div>
+                      )}
+                      <div ref={chatEndRef} />
+                    </div>
+
+                    {/* Chat Input form */}
+                    <form onSubmit={handleChatSubmit} class="p-4 border-t border-slate-800 bg-slate-900/50 flex gap-3">
+                      <input 
+                        type="text" 
+                        value={chatInput}
+                        onChange={e => setChatInput(e.target.value)}
+                        placeholder="Ask Robin to check gaps, list physicians, or book consultations..."
+                        class="flex-1 px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-brand-500 text-sm"
+                      />
+                      <button 
+                        type="submit"
+                        disabled={isChatLoading}
+                        class="px-5 py-3 bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold rounded-xl text-sm transition-colors shadow-lg shadow-brand-500/15 disabled:opacity-50"
+                      >
+                        Send
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Thoughts / Logical Reasoning Drawer Panel */}
+                  <div class="w-80 flex flex-col bg-slate-900 border border-slate-800 rounded-2xl shadow-lg p-5 overflow-hidden">
+                    <div class="border-b border-slate-800 pb-3 mb-4">
+                      <h4 class="text-sm font-bold text-white">Robin's Reasonings Drawer</h4>
+                      <p class="text-[11px] text-slate-500 mt-0.5">Real-time Agentic SDK Logical Trace</p>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto space-y-4">
+                      {chatThoughts.length > 0 ? (
+                        chatThoughts.map((thought, i) => {
+                          let type = "system";
+                          let icon = "⚙️";
+                          if (thought.toLowerCase().includes("database") || thought.toLowerCase().includes("fhir")) {
+                            type = "fhir";
+                            icon = "📂";
+                          } else if (thought.toLowerCase().includes("gap") || thought.toLowerCase().includes("hedis")) {
+                            type = "hedis";
+                            icon = "⚠️";
+                          } else if (thought.toLowerCase().includes("call") || thought.toLowerCase().includes("bland")) {
+                            type = "call";
+                            icon = "📞";
+                          } else if (thought.toLowerCase().includes("calling") || thought.toLowerCase().includes("tool")) {
+                            type = "tool";
+                            icon = "🛠️";
+                          }
+
+                          return (
+                            <div key={i} class="bg-slate-950 border border-slate-800 p-3 rounded-xl flex items-start space-x-2.5">
+                              <span class="text-base leading-none">{icon}</span>
+                              <div class="flex-1">
+                                <span class="text-[10px] text-brand-500 font-semibold uppercase tracking-wider">{type} thought</span>
+                                <p class="text-xs text-slate-300 mt-1 leading-normal font-mono">{thought}</p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div class="h-full flex items-center justify-center text-center p-6 text-slate-600 text-xs">
+                          Reasoning logs will stream here during assistant operations...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+
+              {/* TAB 3: EHR Vault (FHIR Viewer & Fasten) */}
+              {activeTab === "vault" && (
+                <div class="space-y-6">
+                  {/* Fasten Health linkages section */}
+                  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                      <div>
+                        <h4 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Fasten EHR Provider links</h4>
+                        <p class="text-xs text-slate-500 mt-0.5">Secure Blue Button 2.0 / OAuth sync connection</p>
+                      </div>
+                      <button 
+                        onClick={() => setShowLinkModal(true)}
+                        class="px-3.5 py-2 bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold rounded-xl text-xs transition-colors flex items-center space-x-1"
+                      >
+                        <Icon name="plus" className="w-4 h-4" />
+                        <span>Link Healthcare Provider</span>
+                      </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {connections.map((conn, idx) => (
+                        <div key={idx} class="p-4 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+                          <div>
+                            <h5 class="text-sm font-bold text-white">{conn.provider_name || "Stanford Healthcare"}</h5>
+                            <p class="text-xs text-slate-500 mt-1">Status: <span class="text-brand-500 font-semibold">{conn.status}</span> | Connection ID: {conn.org_connection_id}</p>
+                          </div>
+                          <button 
+                            disabled={isSyncing}
+                            onClick={() => syncFastenProvider(conn.org_connection_id)}
+                            class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg text-xs transition-colors disabled:opacity-50 flex items-center space-x-1.5"
+                          >
+                            <Icon name="sync" className="w-3.5 h-3.5" />
+                            <span>Sync</span>
+                          </button>
+                        </div>
+                      ))}
+                      {connections.length === 0 && (
+                        <div class="col-span-2 text-center py-6 text-slate-600 text-xs bg-slate-950 border border-dashed border-slate-800 rounded-xl">
+                          No provider linked. Click 'Link Healthcare Provider' to connect via Stitch OAuth Web widget.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* STITCH OVERLAY WEB MODAL */}
+                  {showLinkModal && (
+                    <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                      <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl h-[70vh] shadow-2xl flex flex-col overflow-hidden">
+                        <div class="bg-slate-900 px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                          <h4 class="text-lg font-bold text-white">Stitch EHR Authentication Link</h4>
+                          <button 
+                            onClick={() => setShowLinkModal(false)}
+                            class="text-slate-500 hover:text-white"
+                          >
+                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        <iframe 
+                          src="/fasten-stitch.html" 
+                          class="flex-1 w-full border-none bg-slate-950"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* FHIR categories listing */}
+                  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-28rem)]">
+                    {/* Categories menu */}
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg overflow-y-auto">
+                      <h4 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">FHIR Resource Categories</h4>
+                      <div class="space-y-1">
+                        {[
+                          { key: "Patient", count: 1 },
+                          { key: "Condition", count: fhirResources["Condition"]?.length || 2 },
+                          { key: "Observation", count: fhirResources["Observation"]?.length || 3 },
+                          { key: "MedicationRequest", count: fhirResources["MedicationRequest"]?.length || 2 }
+                        ].map(cat => (
+                          <button
+                            key={cat.key}
+                            onClick={() => handleCategoryChange(cat.key)}
+                            class={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                              selectedCategory === cat.key
+                                ? "bg-brand-500/10 text-brand-500 border border-brand-500/20"
+                                : "text-slate-400 hover:bg-slate-800/40 hover:text-white border border-transparent"
+                            }`}
+                          >
+                            <span>{cat.key}</span>
+                            <span class="bg-slate-950 border border-slate-800 px-2 py-0.5 rounded text-[10px] text-slate-500">{cat.count}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Matching List */}
+                      <h4 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mt-6 mb-3">Resource Instance list</h4>
+                      <div class="space-y-1.5">
+                        {(fhirResources[selectedCategory] || []).map((entry, idx) => {
+                          const res = entry.resource;
+                          let title = res.text || res.id;
+                          if (res.resourceType === "Condition") {
+                            title = res.code?.text || res.id;
+                          } else if (res.resourceType === "Observation") {
+                            title = res.code?.text || `${res.code?.coding?.[0]?.display || res.id}`;
+                          } else if (res.resourceType === "Patient") {
+                            title = res.name?.[0]?.text || "Eugene Vestel";
+                          } else if (res.resourceType === "MedicationRequest") {
+                            title = res.medicationCodeableConcept?.text || "Prescription Request";
+                          }
+
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                setSelectedResource(res);
+                                fetchCompiledTruth(res.resourceType, res.id);
+                              }}
+                              class={`w-full text-left px-3 py-2 rounded-xl text-[11px] font-mono border transition-all truncate block ${
+                                selectedResource?.id === res.id
+                                  ? "bg-slate-800 text-brand-500 border-slate-700"
+                                  : "bg-slate-950 hover:bg-slate-800/40 border-slate-900 text-slate-300"
+                              }`}
+                            >
+                              {res.resourceType}/{res.id} - {title}
+                            </button>
+                          );
+                        })}
+                        {(fhirResources[selectedCategory] || []).length === 0 && (
+                          <div class="text-center py-6 text-slate-600 text-xs">No resources found.</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Detailed Inspector (Safe Harbor Redaction vs Compiled Truth Timeline) */}
+                    <div class="col-span-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg p-5 overflow-y-auto flex flex-col gap-6">
+                      {selectedResource ? (
+                        <div class="space-y-6">
+                          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                            <div>
+                              <h4 class="text-sm font-bold text-white">{selectedResource.resourceType}/{selectedResource.id}</h4>
+                              <p class="text-[10px] text-slate-500 font-mono mt-0.5">Status: Redacted / Curated</p>
+                            </div>
+                            <div class="flex space-x-2">
+                              <button
+                                onClick={() => runCuratrScan(selectedResource.resourceType, selectedResource.id)}
+                                class="px-2.5 py-1.5 bg-brand-500/10 border border-brand-500/20 text-brand-500 hover:bg-brand-500 hover:text-slate-950 font-bold rounded-lg text-xs transition-all"
+                              >
+                                Scan Code Quality
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Curatr evaluation results if available */}
+                          {curatrAudit && (
+                            <div class="p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl space-y-3">
+                              <h5 class="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center">
+                                <Icon name="alert" className="w-4 h-4 mr-1.5" /> Curatr Coding Quality Scan
+                              </h5>
+                              <p class="text-xs text-slate-400">Scanned fields for deprecated or retired terminologies:</p>
+                              <div class="space-y-2">
+                                {curatrAudit.issues?.map((issue, idx) => (
+                                  <div key={idx} class="p-3 bg-slate-950 border border-slate-800 rounded-lg flex items-center justify-between gap-4">
+                                    <div>
+                                      <span class="text-[10px] bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-2 py-0.5 rounded font-mono font-semibold">{issue.code_system} {issue.retired_code}</span>
+                                      <p class="text-xs text-white font-bold mt-1.5">{issue.message}</p>
+                                      <p class="text-[10px] text-slate-500 mt-1">Suggested Upgrade: {issue.suggested_code} ({issue.suggested_display})</p>
+                                    </div>
+                                    <button
+                                      onClick={() => applyCuratrFix(selectedResource.resourceType, selectedResource.id, issue.fix_key)}
+                                      class="px-2.5 py-1 bg-yellow-400 text-slate-950 font-bold rounded text-xs hover:bg-yellow-300 transition-colors shrink-0"
+                                    >
+                                      Apply Fix
+                                    </button>
+                                  </div>
+                                ))}
+                                {curatrAudit.issues?.length === 0 && (
+                                  <p class="text-xs text-brand-500 font-semibold">No coding issues identified. System compliant!</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Side-by-side PHI Redaction Inspector panel */}
+                          {resourceCuration && (
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <h5 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Original FHIR Resource (Internal PHI)</h5>
+                                <pre class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-[10px] font-mono text-red-400 overflow-x-auto max-h-[30vh]">
+                                  {JSON.stringify(resourceCuration.original || selectedResource, null, 2)}
+                                </pre>
+                              </div>
+                              <div>
+                                <h5 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">HealthClaw Safe Harbor (Redacted)</h5>
+                                <pre class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-[10px] font-mono text-brand-500 overflow-x-auto max-h-[30vh]">
+                                  {JSON.stringify(resourceCuration.compiled_truth || selectedResource, null, 2)}
+                                </pre>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Provenance Audit logs */}
+                          {resourceCuration?.provenance_history && (
+                            <div class="border-t border-slate-800 pt-4">
+                              <h5 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Provenance Audit log timeline</h5>
+                              <div class="space-y-3 relative before:absolute before:inset-y-0 before:left-3 before:w-0.5 before:bg-slate-800">
+                                {resourceCuration.provenance_history.map((prov, i) => (
+                                  <div key={i} class="flex items-start space-x-3.5 relative">
+                                    <div class="w-6 h-6 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-[10px] text-brand-500 font-bold flex-shrink-0 z-10">
+                                      {i + 1}
+                                    </div>
+                                    <div>
+                                      <p class="text-xs font-bold text-white">{prov.action}</p>
+                                      <p class="text-[10px] text-slate-500 mt-0.5">Actor: {prov.author} | Timestamp: {prov.timestamp}</p>
+                                      {prov.summary && (
+                                        <p class="text-xs text-slate-400 mt-1 italic">"{prov.summary}"</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div class="h-full flex items-center justify-center text-center p-6 text-slate-600 text-sm">
+                          Select a FHIR resource instance to view HIPAA Safe Harbor PHI Redactions, Curatr Evaluations, and Provenance histories.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+
+              {/* TAB 4: OUTBOUND CALL SIMULATOR */}
+              {activeTab === "call" && (
+                <div class="space-y-6">
+                  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-2xl mx-auto shadow-lg space-y-6 text-center">
+                    <div>
+                      <h4 class="text-2xl font-bold text-white">Robin Voice dialing simulation</h4>
+                      <p class="text-xs text-slate-400 mt-1">Simulate or trigger actual voice calls to physicians for booking coordination</p>
+                    </div>
+
+                    <div class="max-w-md mx-auto space-y-4">
+                      {/* Configuration panel */}
+                      <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-4 text-left">
+                        <div>
+                          <label class="text-xs font-semibold text-slate-500 block mb-1">Call dispatch mechanism</label>
+                          <div class="grid grid-cols-2 gap-3">
+                            <button 
+                              onClick={() => setCallType("simulated")}
+                              class={`py-2 px-3 rounded-lg text-xs font-semibold border transition-all ${
+                                callType === "simulated"
+                                  ? "bg-brand-500/10 text-brand-500 border-brand-500/20"
+                                  : "bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-400"
+                              }`}
+                            >
+                              Mock WebSockets
+                            </button>
+                            <button 
+                              onClick={() => setCallType("bland")}
+                              class={`py-2 px-3 rounded-lg text-xs font-semibold border transition-all ${
+                                callType === "bland"
+                                  ? "bg-brand-500/10 text-brand-500 border-brand-500/20"
+                                  : "bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-400"
+                              }`}
+                            >
+                              Live Bland.ai Outbound
+                            </button>
+                          </div>
+                        </div>
+
+                        {callType === "bland" ? (
+                          <div>
+                            <label class="text-xs font-semibold text-slate-500 block mb-1">Call Target Number (E.164 format)</label>
+                            <input 
+                              type="text" 
+                              value={phoneNumber}
+                              onChange={e => setPhoneNumber(e.target.value)}
+                              placeholder="+15550192834"
+                              class="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white text-xs focus:outline-none"
+                            />
+                          </div>
+                        ) : (
+                          <div class="text-[11px] text-slate-500 italic">
+                            Simulated call establishes a real-time WebSocket connection to `/api/calls/simulate` to stream the speech script.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* CALL CONTROLLER ACTION */}
+                      <button
+                        onClick={toggleCall}
+                        className={`w-full py-3.5 px-4 font-bold rounded-xl text-sm transition-all shadow-lg flex items-center justify-center space-x-2 ${
+                          isCalling
+                            ? "bg-red-500 hover:bg-red-600 text-slate-950 shadow-red-500/10"
+                            : "bg-brand-500 hover:bg-brand-600 text-slate-950 shadow-brand-500/15"
+                        }`}
+                      >
+                        <Icon name="call" className="w-5 h-5" />
+                        <span>{isCalling ? "Hang Up / End Session" : "Launch Assistant Call"}</span>
+                      </button>
+                    </div>
+
+                    {/* STATUS BANNER */}
+                    {callStatus && (
+                      <div class="text-xs bg-slate-950 border border-slate-800 p-3 rounded-xl max-w-md mx-auto text-slate-400 inline-block font-mono">
+                        {callStatus}
+                      </div>
+                    )}
+
+                    {/* WAVEFORM ANIMATION */}
+                    {isCalling && (
+                      <div class="flex justify-center items-center space-x-1.5 h-10 py-2">
+                        <div class="w-1 bg-brand-500 wave-bar rounded-full" style={{ animationDelay: '0.1s' }}></div>
+                        <div class="w-1 bg-brand-500 wave-bar rounded-full" style={{ animationDelay: '0.3s' }}></div>
+                        <div class="w-1 bg-brand-500 wave-bar rounded-full" style={{ animationDelay: '0.5s' }}></div>
+                        <div class="w-1 bg-brand-500 wave-bar rounded-full" style={{ animationDelay: '0.7s' }}></div>
+                        <div class="w-1 bg-brand-500 wave-bar rounded-full" style={{ animationDelay: '0.9s' }}></div>
+                      </div>
+                    )}
+
+                    {/* TRANSCRIPT PANEL */}
+                    {callTranscript.length > 0 && (
+                      <div class="max-w-xl mx-auto bg-slate-950 border border-slate-800 rounded-2xl p-5 text-left space-y-4 max-h-[30vh] overflow-y-auto">
+                        <div class="border-b border-slate-800 pb-2 mb-2 flex justify-between items-center">
+                          <h5 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Live Call Dialogue Feed</h5>
+                          <span class="text-[10px] text-brand-500 font-semibold uppercase tracking-wider">WebSocket Inbound</span>
+                        </div>
+                        {callTranscript.map((t, idx) => (
+                          <div key={idx} class={`p-3 rounded-xl border text-xs leading-normal ${
+                            t.speaker === "agent"
+                              ? "bg-brand-500/5 border-brand-500/10 text-brand-500 pl-4 border-l-4 border-l-brand-500"
+                              : "bg-slate-900 border-slate-800 text-slate-300 pl-4 border-l-4 border-l-slate-600"
+                          }`}>
+                            <strong class="uppercase text-[9px] block mb-1 tracking-wider text-slate-500">{t.speaker} speaking</strong>
+                            {t.text}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+
+              {/* TAB 5: FORM VISION FILLER */}
+              {activeTab === "filler" && selectedForm && (
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-12rem)]">
+                  
+                  {/* Left Form config & scanner */}
+                  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between overflow-y-auto">
+                    <div class="space-y-4">
+                      <div>
+                        <h4 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-2">Form Vision Scanner setup</h4>
+                        <p class="text-xs text-slate-500 leading-relaxed">Provide a referral document PDF simulator URL, or use the pre-seeded specialist referral template.</p>
+                      </div>
+
+                      <div class="space-y-3">
+                        <div>
+                          <label class="text-xs font-semibold text-slate-500 block mb-1">Referral Document URL</label>
+                          <input 
+                            type="text" 
+                            value={formDocUrl}
+                            onChange={e => setFormDocUrl(e.target.value)}
+                            class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label class="text-xs font-semibold text-slate-500 block mb-1">Form Templates selector</label>
+                          <div class="grid grid-cols-2 gap-2">
+                            {forms.map(f => (
+                              <button
+                                key={f.id}
+                                onClick={() => setSelectedForm(f)}
+                                class={`py-2 px-3 rounded-lg text-xs font-semibold border text-left truncate transition-all ${
+                                  selectedForm.id === f.id
+                                    ? "bg-brand-500/10 text-brand-500 border-brand-500/20"
+                                    : "bg-slate-950 hover:bg-slate-800 border-slate-900 text-slate-400"
+                                }`}
+                              >
+                                {f.title}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={handleFormFill}
+                        disabled={isFilling}
+                        class="w-full py-3 px-4 bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold rounded-xl text-xs transition-colors shadow-lg shadow-brand-500/15 flex items-center justify-center space-x-2"
+                      >
+                        <Icon name="sync" className={`w-4 h-4 ${isFilling ? 'animate-spin' : ''}`} />
+                        <span>{isFilling ? "Analyzing Layout via Gemini Vision..." : "Extract & Autofill Form Fields"}</span>
+                      </button>
+                    </div>
+
+                    {formStatus && (
+                      <div class="mt-4 p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-center text-slate-400">
+                        {formStatus}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right pre-filled fields review & signing */}
+                  <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-lg p-5 overflow-y-auto flex flex-col justify-between">
+                    <div>
+                      <div class="border-b border-slate-800 pb-3 mb-4">
+                        <h4 class="text-sm font-bold text-white">{selectedForm.title} Fields Review</h4>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Autofilled fields mapping from EHR Vault</p>
+                      </div>
+
+                      <div class="space-y-3.5">
+                        {selectedForm.fields?.map((field, idx) => {
+                          const val = filledFields[field.key] || "";
+                          return (
+                            <div key={idx} class="space-y-1">
+                              <label class="text-xs font-semibold text-slate-400 block">{field.label}</label>
+                              <input 
+                                type="text"
+                                value={val}
+                                onChange={e => {
+                                  setFilledFields(prev => ({ ...prev, [field.key]: e.target.value }));
+                                }}
+                                placeholder={field.placeholder || ""}
+                                class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Canvas/Mouse signature drawing box */}
+                    <div class="mt-6 border-t border-slate-800 pt-4 space-y-4">
+                      <div>
+                        <label class="text-xs font-semibold text-slate-400 block mb-1">Patient Signature Pad (Sign via mouse pointer)</label>
+                        <div class="h-28 bg-slate-950 border border-dashed border-slate-800 rounded-xl flex items-center justify-center text-slate-600 text-xs select-none cursor-crosshair hover:bg-slate-900/50 transition-colors">
+                          {isSigned ? (
+                            <span class="text-brand-500 font-semibold flex items-center">
+                              <Icon name="check" className="w-4 h-4 mr-1" /> Signature Captured (Eugene Vestel)
+                            </span>
+                          ) : (
+                            <span>Drag mouse to draw signature here...</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div class="flex gap-3">
+                        <button 
+                          onClick={() => setIsSigned(true)}
+                          class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-colors"
+                        >
+                          Capture Signature
+                        </button>
+                        <button 
+                          onClick={handleFormSubmit}
+                          class="flex-1 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold rounded-xl text-xs transition-colors"
+                        >
+                          Sign & Submit to EHR Vault
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+            </main>
+          </div>
+        </div>
+      );
+    }
+
+    const rootElement = document.getElementById("root");
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(<App />);
+  </script>
+</body>
+</html>

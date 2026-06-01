@@ -1,0 +1,11 @@
+# Ignore python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.git/
+.gitignore
+
+# Ignore local database and environment secrets
+healthcare.db
+.env

@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "frontend",
+    "slug": "frontend",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.healthcareagent.app",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "This app accesses health statistics to provide your virtual agent with accurate medication and clinical condition updates.",
+        "NSHealthUpdateUsageDescription": "This app syncs health statistics with your clinical portal.",
+        "NSCameraUsageDescription": "This app requires camera access to photograph and scan clinical intake forms and medical documents for EHR synchronization."
+      }
+    },
+    "android": {
+      "package": "com.healthcareagent.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-asset"
+    ]
+  }
+}

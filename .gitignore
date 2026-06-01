@@ -1,0 +1,12 @@
+# Python files
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# Local Database and Secrets
+backend/healthcare.db
+backend/.env
+
+# macOS
+.DS_Store
