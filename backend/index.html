@@ -221,7 +221,7 @@
 
           const refillsRes = await fetch("/api/health/refills");
           const ref = await refillsRes.json();
-          setRefills(ref);
+          setRefills(ref.refills || []);
 
           const habitsRes = await fetch("/api/health/habits");
           const hab = await habitsRes.json();
@@ -771,7 +771,7 @@
                             })}
                           </div>
                           <div class="flex justify-between text-xs border-t border-slate-800 pt-3">
-                            <span class="text-slate-400">Weekly Avg Steps: <strong class="text-brand-500">{habits.average_steps}</strong></span>
+                            <span class="text-slate-400">Weekly Avg Steps: <strong class="text-brand-500">{habits.steps_average}</strong></span>
                             <span class="text-slate-400">Target Goal: <strong class="text-white">10k Steps/Day</strong></span>
                           </div>
                         </div>
@@ -799,7 +799,7 @@
                             })}
                           </div>
                           <div class="flex justify-between text-xs border-t border-slate-800 pt-3">
-                            <span class="text-slate-400">Avg Heart Rate: <strong class="text-brand-500">{habits.average_resting_hr} BPM</strong></span>
+                            <span class="text-slate-400">Avg Heart Rate: <strong class="text-brand-500">{habits.resting_hr_average} BPM</strong></span>
                             <span class="text-slate-400">Sleep Trend: <strong class="text-white">Optimal Deep Sleep</strong></span>
                           </div>
                         </div>
